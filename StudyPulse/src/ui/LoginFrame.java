@@ -33,7 +33,6 @@ public class LoginFrame extends JFrame {
     // ── top brand panel ───────────────────────────────────────────────────────
     private JPanel  brandPanel;
     private JLabel  lblLogo;
-    private JLabel  lblAppName;
 
     // ── card switcher ─────────────────────────────────────────────────────────
     private JPanel     cardPanel;
@@ -66,6 +65,7 @@ public class LoginFrame extends JFrame {
     private JButton        btnToLogin;
     private JCheckBox chckbxNewCheckBox;
     private JCheckBox chckbxNewCheckBox_1;
+    private JLabel lblAppName_1;
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -95,13 +95,7 @@ public class LoginFrame extends JFrame {
         lblLogo = buildLogoLabel();
         lblLogo.setAlignmentX(CENTER_ALIGNMENT);
 
-        lblAppName = new JLabel("StudyPulse", SwingConstants.CENTER);
-        lblAppName.setFont(new Font("Arial Rounded MT Bold", Font.BOLD, 22));
-        lblAppName.setForeground(CLR_WHITE);
-        lblAppName.setAlignmentX(CENTER_ALIGNMENT);
-
         brandPanel.add(lblLogo);
-        brandPanel.add(lblAppName);
 
         // ── card panel ────────────────────────────────────────────────────────
         cardLayout = new CardLayout();
@@ -115,6 +109,12 @@ public class LoginFrame extends JFrame {
         cardPanel.add(registerCard, "register");
 
         getContentPane().add(brandPanel, BorderLayout.NORTH);
+        
+        lblAppName_1 = new JLabel("StudyPulse", SwingConstants.CENTER);
+        lblAppName_1.setForeground(Color.WHITE);
+        lblAppName_1.setFont(new Font("Arial Rounded MT Bold", Font.BOLD, 22));
+        lblAppName_1.setAlignmentX(0.5f);
+        brandPanel.add(lblAppName_1);
         getContentPane().add(cardPanel,  BorderLayout.CENTER);
     }
 
