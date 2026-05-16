@@ -32,14 +32,17 @@ import util.SessionContext;
 public class CalendarPanel extends JPanel {
     private final NoteDAO dao = new NoteDAO();
     private int year, month;
-    private JPanel  gridPanel;
-    private JLabel  lblMonthYear;
-    private JPanel  noteArea;
+    private JPanel    gridPanel;
+    private JLabel    lblMonthYear;
+    private JPanel    noteArea;
+    private JPanel    pastNoteArea;      // read-only view for past dates
     private JTextArea noteTA;
-    private JLabel  noteDateLabel;
+    private JTextArea pastNoteTA;        // read-only text area
+    private JLabel    noteDateLabel;
+    private JLabel    pastNoteDateLabel;
     private LocalDate selectedDate;
     private JScrollPane mainScroll;
-    private JPanel  mainWrap;
+    private JPanel    mainWrap;
 
     public CalendarPanel() {
         LocalDate now = LocalDate.now();
@@ -56,7 +59,7 @@ public class CalendarPanel extends JPanel {
         mainWrap.setLayout(new BoxLayout(mainWrap, BoxLayout.Y_AXIS));
         mainWrap.setBorder(BorderFactory.createEmptyBorder(20, 50, 30, 50));
 
-        // Month navigation header
+        // ── Month navigation header ───────────────────────────────────────
         JPanel calHdr = new JPanel(new BorderLayout());
         calHdr.setBackground(UI.POMO_RED);
         calHdr.setMaximumSize(new Dimension(520, 40));
@@ -74,7 +77,7 @@ public class CalendarPanel extends JPanel {
         calHdr.add(lblMonthYear, BorderLayout.CENTER);
         calHdr.add(next,         BorderLayout.EAST);
 
-        // Day-of-week row
+        // ── Day-of-week row ───────────────────────────────────────────────
         JPanel dayNames = new JPanel(new GridLayout(1, 7, 4, 0));
         dayNames.setBackground(UI.POMO_RED);
         dayNames.setMaximumSize(new Dimension(520, 24));
@@ -85,17 +88,17 @@ public class CalendarPanel extends JPanel {
             dayNames.add(l);
         }
 
-        // Calendar grid
+        // ── Calendar grid ─────────────────────────────────────────────────
         gridPanel = new JPanel(new GridLayout(0, 7, 4, 4));
         gridPanel.setBackground(UI.POMO_RED);
         gridPanel.setMaximumSize(new Dimension(520, 280));
 
-        // Notes area (hidden until day selected)
+        // ── Editable note area (today / future) ───────────────────────────
         noteArea = new JPanel();
         noteArea.setBackground(new Color(160, 45, 36));
         noteArea.setLayout(new BoxLayout(noteArea, BoxLayout.Y_AXIS));
         noteArea.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
-        noteArea.setMaximumSize(new Dimension(520, 200));
+        noteArea.setMaximumSize(new Dimension(520, 220));
         noteArea.setVisible(false);
 
         noteDateLabel = new JLabel("Notes for ...");
@@ -103,12 +106,11 @@ public class CalendarPanel extends JPanel {
         noteDateLabel.setForeground(Color.WHITE);
         noteDateLabel.setAlignmentX(LEFT_ALIGNMENT);
 
-        // FIX: noteTA must be opaque with SOLID background
         noteTA = new JTextArea(4, 30);
         noteTA.setFont(UI.F_BODY);
         noteTA.setLineWrap(true);
         noteTA.setWrapStyleWord(true);
-        noteTA.setBackground(new Color(140, 35, 28));  // solid dark red
+        noteTA.setBackground(new Color(140, 35, 28));
         noteTA.setForeground(Color.WHITE);
         noteTA.setCaretColor(Color.WHITE);
         noteTA.setOpaque(true);
@@ -145,6 +147,59 @@ public class CalendarPanel extends JPanel {
         noteArea.add(Box.createVerticalStrut(8));
         noteArea.add(saveNote);
 
+        // ── Read-only past note area ───────────────────────────────────────
+        pastNoteArea = new JPanel();
+        pastNoteArea.setBackground(new Color(120, 35, 28));   // darker = archived feel
+        pastNoteArea.setLayout(new BoxLayout(pastNoteArea, BoxLayout.Y_AXIS));
+        pastNoteArea.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+        pastNoteArea.setMaximumSize(new Dimension(520, 220));
+        pastNoteArea.setVisible(false);
+
+        pastNoteDateLabel = new JLabel("📁  Archived — ...");
+        pastNoteDateLabel.setFont(new Font("Arial Rounded MT Bold", Font.PLAIN, 13));
+        pastNoteDateLabel.setForeground(new Color(255, 200, 195));
+        pastNoteDateLabel.setAlignmentX(LEFT_ALIGNMENT);
+
+        // Hint label
+        JLabel archiveHint = new JLabel("Past dates are read-only");
+        archiveHint.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        archiveHint.setForeground(new Color(220, 160, 155));
+        archiveHint.setAlignmentX(LEFT_ALIGNMENT);
+
+        pastNoteTA = new JTextArea(4, 30);
+        pastNoteTA.setFont(UI.F_BODY);
+        pastNoteTA.setLineWrap(true);
+        pastNoteTA.setWrapStyleWord(true);
+        pastNoteTA.setEditable(false);                         // READ-ONLY
+        pastNoteTA.setBackground(new Color(105, 28, 22));
+        pastNoteTA.setForeground(new Color(240, 210, 208));
+        pastNoteTA.setDisabledTextColor(new Color(240, 210, 208));
+        pastNoteTA.setOpaque(true);
+        pastNoteTA.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 255, 255, 40)),
+            BorderFactory.createEmptyBorder(8, 10, 8, 10)
+        ));
+
+        JScrollPane pastScroll = new JScrollPane(pastNoteTA);
+        pastScroll.setMaximumSize(new Dimension(520, 110));
+        pastScroll.setAlignmentX(LEFT_ALIGNMENT);
+        pastScroll.setBackground(new Color(105, 28, 22));
+        pastScroll.getViewport().setBackground(new Color(105, 28, 22));
+        pastScroll.setBorder(null);
+
+        // "No note" placeholder shown inside the read-only area
+        JLabel noNoteHint = new JLabel("No note was saved for this day.");
+        noNoteHint.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        noNoteHint.setForeground(new Color(200, 150, 148));
+        noNoteHint.setAlignmentX(LEFT_ALIGNMENT);
+
+        pastNoteArea.add(pastNoteDateLabel);
+        pastNoteArea.add(Box.createVerticalStrut(4));
+        pastNoteArea.add(archiveHint);
+        pastNoteArea.add(Box.createVerticalStrut(8));
+        pastNoteArea.add(pastScroll);
+
+        // ── Assemble ──────────────────────────────────────────────────────
         mainWrap.add(calHdr);
         mainWrap.add(Box.createVerticalStrut(8));
         mainWrap.add(dayNames);
@@ -152,6 +207,7 @@ public class CalendarPanel extends JPanel {
         mainWrap.add(gridPanel);
         mainWrap.add(Box.createVerticalStrut(14));
         mainWrap.add(noteArea);
+        mainWrap.add(pastNoteArea);
 
         mainScroll = new JScrollPane(mainWrap);
         mainScroll.setBackground(UI.POMO_RED);
@@ -168,11 +224,10 @@ public class CalendarPanel extends JPanel {
         YearMonth ym = YearMonth.of(year, month);
         lblMonthYear.setText(ym.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + year);
 
-        int firstDay   = LocalDate.of(year, month, 1).getDayOfWeek().getValue() % 7;
-        int daysInMonth = ym.lengthOfMonth();
-        LocalDate today = LocalDate.now();
+        int       firstDay    = LocalDate.of(year, month, 1).getDayOfWeek().getValue() % 7;
+        int       daysInMonth = ym.lengthOfMonth();
+        LocalDate today       = LocalDate.now();
 
-        // Empty cells before first day
         for (int i = 0; i < firstDay; i++) {
             JPanel empty = new JPanel();
             empty.setBackground(new Color(160, 48, 38));
@@ -180,39 +235,70 @@ public class CalendarPanel extends JPanel {
         }
 
         for (int d = 1; d <= daysInMonth; d++) {
-            LocalDate date = LocalDate.of(year, month, d);
-            boolean isToday = date.equals(today);
-            boolean isSel   = date.equals(selectedDate);
+            LocalDate date   = LocalDate.of(year, month, d);
+            boolean isToday  = date.equals(today);
+            boolean isSel    = date.equals(selectedDate);
+            boolean isPast   = date.isBefore(today);   // ← past-date flag
 
-            // FIX: solid colors only — no transparency on buttons
             JButton btn = new JButton(String.valueOf(d));
-            btn.setFont(new Font("Segoe UI", isToday ? Font.BOLD : Font.PLAIN, 12));
+            btn.setPreferredSize(new Dimension(60, 40));
 
-            if (isToday || isSel) {
+            if (isPast) {
+                // ── past: muted / greyed-out appearance ──
+                btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+                btn.setBackground(new Color(140, 42, 33));       // darker, desaturated
+                btn.setForeground(new Color(210, 165, 162));      // dimmed text
+                btn.setOpaque(true);
+                btn.setContentAreaFilled(true);
+                btn.setBorderPainted(false);
+                btn.setFocusPainted(false);
+                btn.setCursor(Cursor.getPredefinedCursor(Cursor.DEFAULT_CURSOR));
+
+                // Hover: slightly lighter but still muted
+                btn.addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { btn.setBackground(new Color(150, 46, 36)); }
+                    public void mouseExited(MouseEvent e)  { btn.setBackground(new Color(140, 42, 33)); }
+                });
+            } else if (isToday || isSel) {
+                btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
                 btn.setBackground(Color.WHITE);
                 btn.setForeground(UI.POMO_RED);
                 btn.setOpaque(true);
                 btn.setContentAreaFilled(true);
+                btn.setBorderPainted(false);
+                btn.setFocusPainted(false);
+                btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+                btn.addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { btn.setBackground(new Color(240, 240, 240)); }
+                    public void mouseExited(MouseEvent e)  { btn.setBackground(Color.WHITE); }
+                });
             } else {
+                // future
+                btn.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                 btn.setBackground(new Color(175, 50, 40));
                 btn.setForeground(Color.WHITE);
                 btn.setOpaque(true);
                 btn.setContentAreaFilled(true);
+                btn.setBorderPainted(false);
+                btn.setFocusPainted(false);
+                btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+                btn.addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { btn.setBackground(new Color(155, 38, 30)); }
+                    public void mouseExited(MouseEvent e)  { btn.setBackground(new Color(175, 50, 40)); }
+                });
             }
 
-            btn.setBorderPainted(false);
-            btn.setFocusPainted(false);
-            btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-            Color hoverBg = isToday ? new Color(240, 240, 240) : new Color(155, 38, 30);
-            Color normalBg = (isToday || isSel) ? Color.WHITE : new Color(175, 50, 40);
-            btn.addMouseListener(new MouseAdapter() {
-                public void mouseEntered(MouseEvent e) { btn.setBackground(hoverBg); }
-                public void mouseExited(MouseEvent e)  { btn.setBackground(normalBg); }
+            final LocalDate fd      = date;
+            final boolean   fIsPast = isPast;
+            btn.addActionListener(e -> {
+                if (fIsPast) {
+                    selectPastDay(fd);   // read-only view
+                } else {
+                    selectDay(fd);       // editable
+                }
             });
-
-            final LocalDate fd = date;
-            btn.addActionListener(e -> selectDay(fd));
             gridPanel.add(btn);
         }
 
@@ -220,16 +306,38 @@ public class CalendarPanel extends JPanel {
         gridPanel.repaint();
     }
 
+    /** Show editable note area for today / future dates. */
     private void selectDay(LocalDate date) {
         selectedDate = date;
         noteDateLabel.setText("Notes for " + date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")));
-        // Load existing note from DB
         if (SessionContext.getUser() != null) {
             String existing = dao.getNoteForDate(SessionContext.getUser().getId(), date);
             noteTA.setText(existing != null ? existing : "");
         }
         noteArea.setVisible(true);
-        buildGrid(); // Rebuild to show selection highlight
+        pastNoteArea.setVisible(false);
+        buildGrid();
+        mainWrap.revalidate();
+        mainWrap.repaint();
+    }
+
+    /** Show read-only archived note view for past dates. */
+    private void selectPastDay(LocalDate date) {
+        selectedDate = date;
+        pastNoteDateLabel.setText("📁  Archived — "
+                + date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy")));
+        String existing = null;
+        if (SessionContext.getUser() != null) {
+            existing = dao.getNoteForDate(SessionContext.getUser().getId(), date);
+        }
+        if (existing != null && !existing.isBlank()) {
+            pastNoteTA.setText(existing);
+        } else {
+            pastNoteTA.setText("No note was saved for this day.");
+        }
+        noteArea.setVisible(false);
+        pastNoteArea.setVisible(true);
+        buildGrid();
         mainWrap.revalidate();
         mainWrap.repaint();
     }
