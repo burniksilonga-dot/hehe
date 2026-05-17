@@ -12,12 +12,14 @@ import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -30,8 +32,9 @@ import util.SessionContext;
 public class ActivityPanel extends JPanel {
     private final StudySessionDAO dao = new StudySessionDAO();
     private JPanel chartPanel;
-    private JLabel lblHours, lblDays, lblStreak;
-    private Map<String, Integer> weekData = new LinkedHashMap<>();
+    private JLabel lblHours, lblDays, lblStreak, cTitle;
+    private JComboBox<String> timeFilter;
+    private Map<String, Integer> chartData = new LinkedHashMap<>();
     private JScrollPane scroll;
 
     public ActivityPanel() {
@@ -64,11 +67,8 @@ public class ActivityPanel extends JPanel {
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // 3 stat cards in a row
-     // 3 stat cards in a row
         JPanel stats = new JPanel(new GridLayout(1, 3, 12, 0));
         stats.setBackground(Color.WHITE);
-        
-        // FIX: Bump height slightly to 150
         stats.setMaximumSize(new Dimension(520, 140));
         stats.setPreferredSize(new Dimension(520, 140));
         stats.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -80,13 +80,24 @@ public class ActivityPanel extends JPanel {
         stats.add(statCard(lblDays,   "days accessed", "📅"));
         stats.add(statCard(lblStreak, "day streak",    "🔥"));
         
-        // --- DELETED THE BOTTOM_ALIGNMENT LINES HERE ---
-
-        JLabel cTitle = new JLabel("Focus Hours — This Week");
+        // ── Chart Header (Title + Dropdown) ──
+        JPanel chartHdr = new JPanel(new BorderLayout());
+        chartHdr.setBackground(Color.WHITE);
+        chartHdr.setMaximumSize(new Dimension(520, 40));
+        chartHdr.setBorder(BorderFactory.createEmptyBorder(14, 0, 8, 0));
+        
+        cTitle = new JLabel("Focus Hours");
         cTitle.setFont(new Font("Segoe UI", Font.BOLD, 13));
         cTitle.setForeground(UI.TEXT_DARK);
-        cTitle.setBorder(BorderFactory.createEmptyBorder(14, 0, 8, 0));
-        cTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        timeFilter = new JComboBox<>(new String[]{"This Week", "This Month", "This Year"});
+        timeFilter.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        timeFilter.setBackground(Color.WHITE);
+        timeFilter.setFocusable(false);
+        timeFilter.addActionListener(e -> refresh());
+        
+        chartHdr.add(cTitle, BorderLayout.WEST);
+        chartHdr.add(timeFilter, BorderLayout.EAST);
 
         // ── Improved chart panel ──────────────────────────────────────────
         chartPanel = new JPanel() {
@@ -109,8 +120,7 @@ public class ActivityPanel extends JPanel {
                 int chartH = H - PAD_TOP  - PAD_BOTTOM;
                 int bottom = PAD_TOP + chartH;   
 
-                // ── empty state ──
-                if (weekData.isEmpty()) {
+                if (chartData.isEmpty()) {
                     g2.setColor(UI.TEXT_GRAY);
                     g2.setFont(new Font("Segoe UI", Font.PLAIN, 12));
                     String msg = "No sessions recorded yet. Start a Pomodoro to track!";
@@ -119,8 +129,8 @@ public class ActivityPanel extends JPanel {
                     return;
                 }
 
-                int n   = weekData.size();
-                int max = weekData.values().stream().max(Integer::compare).orElse(1);
+                int n   = chartData.size();
+                int max = chartData.values().stream().max(Integer::compare).orElse(1);
                 int step = Math.max(1, (int) Math.ceil((double) max / NUM_GRID));
                 int gridMax = step * NUM_GRID;
 
@@ -128,7 +138,6 @@ public class ActivityPanel extends JPanel {
                 g2.setFont(labelFont);
                 FontMetrics fm = g2.getFontMetrics();
 
-                // ── horizontal grid lines + Y-axis labels ──
                 g2.setStroke(new BasicStroke(1f));
                 for (int i = 0; i <= NUM_GRID; i++) {
                     int val = i * step;
@@ -141,51 +150,74 @@ public class ActivityPanel extends JPanel {
                     g2.drawString(yLbl, PAD_LEFT - lw - 4, y + fm.getAscent() / 2 - 1);
                 }
 
-                // ── Y-axis title ──
                 g2.setColor(new Color(160, 160, 160));
                 g2.setFont(new Font("Segoe UI", Font.PLAIN, 9));
                 g2.drawString("pomos", 0, PAD_TOP + 8);
 
-                // ── baseline ──
                 g2.setColor(new Color(200, 200, 200));
                 g2.setStroke(new BasicStroke(1.2f));
                 g2.drawLine(PAD_LEFT, bottom, PAD_LEFT + chartW, bottom);
 
-                // ── bars ──
                 int barGroupW = chartW / n;
-                int barW      = (int) (barGroupW * 0.55);
+                int barW      = Math.max(4, (int) (barGroupW * 0.65)); // Ensure bars don't disappear
                 int bx        = PAD_LEFT + (barGroupW - barW) / 2;
                 String today  = LocalDate.now().toString();
+                String thisMonth = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
 
                 g2.setFont(labelFont);
                 fm = g2.getFontMetrics();
+                
+                String filter = (String) timeFilter.getSelectedItem();
+                boolean isMonthView = "This Month".equals(filter);
+                boolean isYearView = "This Year".equals(filter);
 
-                for (Map.Entry<String, Integer> e : weekData.entrySet()) {
-                    boolean isToday = e.getKey().equals(today);
+                int i = 0;
+                for (Map.Entry<String, Integer> e : chartData.entrySet()) {
+                    boolean isCurrent = isYearView ? e.getKey().equals(thisMonth) : e.getKey().equals(today);
                     int barH = (int) ((double) e.getValue() / gridMax * chartH);
                     if (barH < 2 && e.getValue() > 0) barH = 2; 
 
-                    g2.setColor(isToday ? UI.POMO_RED : new Color(245, 192, 188));
-                    g2.fillRoundRect(bx, bottom - barH, barW, barH, 5, 5);
+                    Color primaryColor = new Color(164, 63, 63); // Soft dark red theme
+                    g2.setColor(isCurrent ? primaryColor : new Color(245, 192, 188));
+                    g2.fillRoundRect(bx, bottom - barH, barW, barH, 4, 4);
 
-                    if (e.getValue() > 0) {
+                    // Draw numbers on top of bars (skip if crowding on Month view)
+                    if (e.getValue() > 0 && (!isMonthView || n <= 15 || e.getValue() > max/3)) {
                         String vLbl = String.valueOf(e.getValue());
                         int vlx = bx + barW / 2 - fm.stringWidth(vLbl) / 2;
-                        g2.setColor(isToday ? UI.POMO_RED : new Color(190, 100, 95));
-                        g2.setFont(new Font("Segoe UI", Font.BOLD, 10));
+                        g2.setColor(isCurrent ? primaryColor : new Color(190, 100, 95));
+                        g2.setFont(new Font("Segoe UI", Font.BOLD, 9));
                         g2.drawString(vLbl, vlx, bottom - barH - 3);
-                        g2.setFont(labelFont);
                     }
 
-                    String dayLbl = e.getKey().length() >= 10 ? e.getKey().substring(8) : "";
-                    int dlx = bx + barW / 2 - fm.stringWidth(dayLbl) / 2;
-                    g2.setColor(isToday ? UI.POMO_RED : new Color(160, 160, 160));
-                    g2.setFont(isToday
-                            ? new Font("Segoe UI", Font.BOLD, 10)
-                            : new Font("Segoe UI", Font.PLAIN, 10));
-                    g2.drawString(dayLbl, dlx, bottom + PAD_BOTTOM - 8);
+                    // Format X-Axis Labels
+                    String label = "";
+                    if (isYearView) {
+                        // Convert YYYY-MM to Jan, Feb, etc.
+                        if (e.getKey().length() >= 7) {
+                            String m = e.getKey().substring(5, 7);
+                            label = switch (m) {
+                                case "01"->"Jan"; case "02"->"Feb"; case "03"->"Mar"; case "04"->"Apr";
+                                case "05"->"May"; case "06"->"Jun"; case "07"->"Jul"; case "08"->"Aug";
+                                case "09"->"Sep"; case "10"->"Oct"; case "11"->"Nov"; case "12"->"Dec";
+                                default->m;
+                            };
+                        }
+                    } else {
+                        // Extract Day DD
+                        label = e.getKey().length() >= 10 ? e.getKey().substring(8) : "";
+                    }
+
+                    // Draw X-axis label (space them out on Month view so they don't overlap)
+                    if (!isMonthView || i % 3 == 0 || isCurrent || i == n - 1) {
+                        int dlx = bx + barW / 2 - fm.stringWidth(label) / 2;
+                        g2.setColor(isCurrent ? primaryColor : new Color(160, 160, 160));
+                        g2.setFont(isCurrent ? new Font("Segoe UI", Font.BOLD, 10) : new Font("Segoe UI", Font.PLAIN, 10));
+                        g2.drawString(label, dlx, bottom + PAD_BOTTOM - 8);
+                    }
 
                     bx += barGroupW;
+                    i++;
                 }
             }
         };
@@ -197,7 +229,7 @@ public class ActivityPanel extends JPanel {
         card.add(title);
         card.add(Box.createVerticalStrut(12));
         card.add(stats);
-        card.add(cTitle);
+        card.add(chartHdr);
         card.add(chartPanel);
 
         wrap.add(card);
@@ -214,18 +246,46 @@ public class ActivityPanel extends JPanel {
     public void refresh() {
         if (SessionContext.getUser() == null) return;
         int uid = SessionContext.getUser().getId();
-        weekData = dao.getWeeklyPomoCount(uid);
-        int total = weekData.values().stream().mapToInt(Integer::intValue).sum();
-        lblHours.setText(String.format("%.1f", total * 25.0 / 60));
-        lblDays.setText(String.valueOf(weekData.size()));
-        lblStreak.setText(String.valueOf(calcStreak()));
+        
+        String filter = (String) timeFilter.getSelectedItem();
+        
+        // Fetch different data based on dropdown selection
+        if ("This Year".equals(filter)) {
+            chartData = dao.getYearlyPomoCount(uid);
+            cTitle.setText("Focus Hours — This Year");
+        } else if ("This Month".equals(filter)) {
+            chartData = dao.getMonthlyPomoCount(uid);
+            cTitle.setText("Focus Hours — This Month");
+        } else {
+            chartData = dao.getWeeklyPomoCount(uid);
+            cTitle.setText("Focus Hours — This Week");
+        }
+
+        // Calculate total Pomodoros
+        int totalPomos = chartData.values().stream().mapToInt(Integer::intValue).sum();
+        
+        // Calculate ACTIVE days/months (only count items where value is greater than 0)
+        int activeCount = (int) chartData.values().stream().filter(v -> v > 0).count();
+
+        // Update the top UI labels
+        lblHours.setText(String.format("%.1f", totalPomos * 25.0 / 60)); // Assumes 25min per pomo
+        lblDays.setText(String.valueOf(activeCount)); // FIXED: Only counts days with work done
+        lblStreak.setText(String.valueOf(calcStreak())); // FIXED: Checks > 0
+        
         chartPanel.repaint();
     }
 
     private int calcStreak() {
+        // Always calculate streak using daily data, not monthly/yearly groupings
+        Map<String, Integer> recent = dao.getWeeklyPomoCount(SessionContext.getUser().getId());
         int s = 0;
         LocalDate d = LocalDate.now();
-        while (weekData.containsKey(d.toString())) { s++; d = d.minusDays(1); }
+        
+        // FIXED: Make sure the day actually exists AND has more than 0 pomodoros
+        while (recent.containsKey(d.toString()) && recent.get(d.toString()) > 0) { 
+            s++; 
+            d = d.minusDays(1); 
+        }
         return s;
     }
 
@@ -233,8 +293,6 @@ public class ActivityPanel extends JPanel {
         JPanel p = new JPanel();
         p.setBackground(new Color(255, 240, 239));
         p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-        
- 
         p.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         
         JLabel ico = new JLabel(icon, SwingConstants.CENTER);
@@ -248,7 +306,6 @@ public class ActivityPanel extends JPanel {
         l.setForeground(new Color(200, 100, 100));
         l.setAlignmentX(Component.CENTER_ALIGNMENT);
         
-        // Use Vertical Glues to perfectly center the block of text/icons inside the card
         p.add(Box.createVerticalGlue()); 
         p.add(ico); 
         p.add(numLbl); 
@@ -260,8 +317,8 @@ public class ActivityPanel extends JPanel {
 
     private JLabel statNum(String t) {
         JLabel l = new JLabel(t, SwingConstants.CENTER);
-        l.setFont(new Font("Segoe UI", Font.BOLD, 28)); // Slightly bumped up size of the numbers
-        l.setForeground(UI.POMO_RED);
+        l.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        l.setForeground(new Color(164, 63, 63));
         return l;
     }
 }
